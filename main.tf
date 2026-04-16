@@ -8,7 +8,13 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.region
+  region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
 }
 
 resource "aws_vpc" "hashicat" {
