@@ -16,12 +16,16 @@ variable "region" {
 
 variable "address_space" {
   description = "The address space that is used by the virtual network. You can supply more than one address space. Changing this forces a new resource to be created."
-  default     = "10.0.0.0/16"
+  default     = "172.16.0.0/16"
 }
 
 variable "subnet_prefix" {
   description = "The address prefix to use for the subnet."
-  default     = "10.0.10.0/24"
+  default     = "172.16.10.0/24"
+}
+
+variable "allowed_ssh_cidr" {
+  description = "The CIDR block permitted to reach port 22 on the instance. Restrict this to a known trusted IP range (e.g. a bastion or CI/CD runner CIDR) rather than leaving it open to the internet."
 }
 
 variable "instance_type" {
