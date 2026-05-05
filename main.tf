@@ -2,13 +2,24 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "=3.42.0"
+      version = "~> 3.42"
     }
   }
 }
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+provider "aws" {
+  alias  = "us-west-2"
+  region = local.sns_region
 
   default_tags {
     tags = {
@@ -198,9 +209,27 @@ resource "tls_private_key" "hashicat" {
 
 locals {
   private_key_filename = "${var.prefix}-ssh-key.pem"
+  sns_region           = "us-west-2"
 }
 
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# SNS topic for alerts, managed in us-west-2.
+# To import the existing topic, run:
+#   terraform import aws_sns_topic.alerts <SNS_TOPIC_ARN>
+# Retrieve the ARN from the AWS Console or:
+#   aws sns list-topics --region us-west-2
+resource "aws_sns_topic" "alerts" {
+  provider = aws.us-west-2
+
+  name         = "${var.prefix}-codekeeper-test-alerts"
+  display_name = "${var.prefix} CodeKeeper Test Alerts"
+
+  tags = {
+    Name        = "${var.prefix}-sns-alerts-${local.sns_region}"
+    environment = "Production"
+  }
 }
