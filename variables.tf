@@ -20,12 +20,20 @@ variable "address_space" {
 }
 
 variable "subnet_prefix" {
-  description = "The address prefix to use for the subnet."
+  description = "The address prefix to use for the subnet. Must be within the address_space CIDR (172.16.0.0/16)."
   default     = "172.16.10.0/24"
 }
 
 variable "allowed_ssh_cidr" {
   description = "The CIDR block permitted to reach port 22 on the instance. Restrict this to a known trusted IP range (e.g. a bastion or CI/CD runner CIDR) rather than leaving it open to the internet."
+
+  validation {
+    condition = (
+      can(cidrnetmask(var.allowed_ssh_cidr)) &&
+      tonumber(regex("/([0-9]+)$", var.allowed_ssh_cidr)) >= 8
+    )
+    error_message = "allowed_ssh_cidr must be a valid CIDR with a prefix length of /8 or more (e.g. 10.0.0.0/8). Fully open CIDRs like 0.0.0.0/0 are not permitted."
+  }
 }
 
 variable "instance_type" {

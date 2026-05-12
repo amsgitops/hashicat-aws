@@ -22,7 +22,7 @@ resource "aws_vpc" "hashicat" {
   enable_dns_hostnames = true
 
   tags = {
-    name        = "${var.prefix}-vpc-${var.region}"
+    Name        = "${var.prefix}-vpc-${var.region}"
     environment = "Production"
     TestTag     = "github-actions-test"
   }
@@ -33,7 +33,7 @@ resource "aws_subnet" "hashicat" {
   cidr_block = var.subnet_prefix
 
   tags = {
-    name = "${var.prefix}-subnet"
+    Name = "${var.prefix}-subnet"
   }
 }
 
@@ -90,6 +90,10 @@ resource "aws_route_table" "hashicat" {
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.hashicat.id
+  }
+
+  tags = {
+    Name = "${var.prefix}-route-table"
   }
 }
 
