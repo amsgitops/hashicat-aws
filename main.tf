@@ -42,38 +42,49 @@ resource "aws_security_group" "hashicat" {
 
   vpc_id = aws_vpc.hashicat.id
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    cidr_blocks     = ["0.0.0.0/0"]
-    prefix_list_ids = []
-  }
-
   tags = {
     Name = "${var.prefix}-security-group"
   }
+}
+
+resource "aws_security_group_rule" "ssh_ingress" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = [var.allowed_ssh_cidr]
+  security_group_id = aws_security_group.hashicat.id
+  description       = "SSH access from trusted CIDR"
+}
+
+resource "aws_security_group_rule" "http_ingress" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.hashicat.id
+  description       = "HTTP access"
+}
+
+resource "aws_security_group_rule" "https_ingress" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.hashicat.id
+  description       = "HTTPS access"
+}
+
+resource "aws_security_group_rule" "egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.hashicat.id
+  description       = "Allow all outbound traffic"
 }
 
 resource "aws_internet_gateway" "hashicat" {
