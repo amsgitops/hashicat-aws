@@ -42,38 +42,39 @@ resource "aws_security_group" "hashicat" {
 
   vpc_id = aws_vpc.hashicat.id
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    cidr_blocks     = ["0.0.0.0/0"]
-    prefix_list_ids = []
-  }
-
   tags = {
     Name = "${var.prefix}-security-group"
   }
+}
+
+# SSH ingress – restricted to a known trusted CIDR (e.g. bastion or CI/CD runner)
+resource "aws_security_group_rule" "ssh_ingress" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = [var.allowed_ssh_cidr]
+  security_group_id = aws_security_group.hashicat.id
+}
+
+# HTTP ingress – required for the publicly accessible cat app (see outputs.tf)
+resource "aws_security_group_rule" "http_ingress" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.hashicat.id
+}
+
+# Egress – required for apt-get and application installation in the provisioner
+resource "aws_security_group_rule" "egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.hashicat.id
 }
 
 resource "aws_internet_gateway" "hashicat" {
