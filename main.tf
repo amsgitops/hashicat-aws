@@ -25,6 +25,7 @@ resource "aws_vpc" "hashicat" {
     name        = "${var.prefix}-vpc-${var.region}"
     environment = "Production"
     TestTag     = "github-actions-test"
+    LoadTestTag = "1778639657406318779"
   }
 }
 
