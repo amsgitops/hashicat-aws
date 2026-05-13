@@ -17,6 +17,17 @@ provider "aws" {
   }
 }
 
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +214,30 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Manages the pre-existing SNS topic in us-west-2.
+#
+# IMPORTANT — import required before first apply:
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+#
+# Skipping the import will cause Terraform to attempt creating a new topic,
+# which will fail due to a name conflict in the same region/account.
+#
+# NOTE: `prevent_destroy` blocks `terraform destroy` and replacement plans,
+# but does NOT protect against `terraform state rm` followed by `terraform apply`.
+# Do NOT run `terraform state rm` on this resource — doing so will cause
+# Terraform to attempt to create a duplicate topic on the next apply.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E 1778650114"
+
+  lifecycle {
+    prevent_destroy = true
+    # Ignore out-of-band changes to display_name so that drift from the live
+    # topic does not generate unexpected update plans.
+    ignore_changes = [display_name]
+  }
 }
