@@ -52,3 +52,8 @@ variable "placeholder" {
   default     = "placekitten.com"
   description = "Image-as-a-service URL. Some other fun ones to try are fillmurray.com, placecage.com, placebeard.it, loremflickr.com, baconmockup.com, placeimg.com, placebear.com, placeskull.com, stevensegallery.com, placedog.net"
 }
+
+variable "sns_codekeeper_alerts_display_name" {
+  description = "Display name for the codekeeper-test-alerts SNS topic (used as the SMS sender name)."
+  default     = "GetTest 1778651191"
+}

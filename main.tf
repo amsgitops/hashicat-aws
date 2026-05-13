@@ -17,6 +17,20 @@ provider "aws" {
   }
 }
 
+# Provider alias for resources that must reside in us-west-2 (SNS topic region).
+# NOTE: Keep the default_tags block below identical to the default provider above.
+# Both providers must tag resources with the same RepositoryId.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +217,34 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# SNS Topic: codekeeper-test-alerts
+#
+# This resource manages the existing SNS topic in us-west-2.
+# Before running `terraform apply` for the first time, import the existing
+# topic into Terraform state with:
+#
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+#
+# IMPORTANT: prevent_destroy only blocks `terraform destroy` while this
+# resource block exists in the configuration. Removing this block entirely
+# will allow Terraform to destroy the topic on the next apply. Do not remove
+# this resource block without first running `terraform state rm
+# aws_sns_topic.codekeeper_test_alerts`.
+#
+# NOTE: tags on aws_sns_topic require AWS provider >= 3.43.0. This workspace
+# pins 3.42.0, so explicit tags are omitted here; the RepositoryId tag is
+# applied automatically via the aliased provider's default_tags block.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = var.sns_codekeeper_alerts_display_name
+
+  lifecycle {
+    # Guard against accidental destruction of this imported, pre-existing topic.
+    # See the comment block above for important caveats about this protection.
+    prevent_destroy = true
+  }
 }
