@@ -8,7 +8,20 @@ terraform {
 }
 
 provider "aws" {
-  region = var.region
+  region              = var.region
+  allowed_account_ids = [var.aws_account_id]
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+provider "aws" {
+  alias               = "us_west_2"
+  region              = "us-west-2"
+  allowed_account_ids = [var.aws_account_id]
 
   default_tags {
     tags = {
@@ -203,4 +216,35 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# This resource manages the pre-existing SNS topic "codekeeper-test-alerts" in us-west-2.
+#
+# IMPORTANT — import MUST be run before the first `terraform apply`, otherwise
+# Terraform will attempt to create a new topic instead of adopting the existing one.
+# Run the following command (replace <ACCOUNT_ID> with the target AWS account ID):
+#
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+#
+# Verify the live topic's current display_name in the AWS console before applying,
+# as Terraform will issue an in-place update if the value differs from "CodeKeeper E2E 1778649170".
+#
+# WARNING: prevent_destroy = true means `terraform destroy` will fail for this
+# entire workspace. Remove this lifecycle block or run:
+#   terraform state rm aws_sns_topic.codekeeper_test_alerts
+# before performing a full workspace teardown.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E 1778649170"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
