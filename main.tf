@@ -17,6 +17,17 @@ provider "aws" {
   }
 }
 
+# Region is intentionally fixed to us-west-2 regardless of var.region,
+# as the codekeeper-test-alerts SNS topic is a pre-existing resource in that specific region.
+# default_tags is intentionally omitted from this aliased provider: the known perpetual-diff
+# bug in AWS provider v3.x (https://github.com/hashicorp/terraform-provider-aws/issues/18311)
+# causes spurious diffs when default_tags and inline tags share the same key. All required
+# tags are set explicitly on each resource that uses this provider.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +214,34 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# SNS Topic managed resource for codekeeper-test-alerts (us-west-2).
+#
+# Import procedure (must be completed before terraform apply):
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+#   ← Replace <ACCOUNT_ID> with the 12-digit AWS account ID before running.
+#
+# After importing, run `terraform plan` and verify no changes are proposed
+# on the `name` attribute before running `terraform apply`. Any diff on
+# `name` will trigger a replacement of the topic.
+# NOTE: do not change `name` to `name_prefix` — that would force replacement
+# and destroy all subscriptions on this production topic.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  name         = "codekeeper-test-alerts"
+  display_name = "GetTest 1778649579"
+
+  tags = {
+    Name         = "codekeeper-test-alerts"
+    environment  = "Production"
+    RepositoryId = "amsgitops/hashicat-aws"
+  }
+
+  lifecycle {
+    # prevent_destroy guards this pre-existing production topic from accidental deletion.
+    prevent_destroy = true
+  }
+
+  provider = aws.us_west_2
 }
