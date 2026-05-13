@@ -52,3 +52,8 @@ variable "placeholder" {
   default     = "placekitten.com"
   description = "Image-as-a-service URL. Some other fun ones to try are fillmurray.com, placecage.com, placebeard.it, loremflickr.com, baconmockup.com, placeimg.com, placebear.com, placeskull.com, stevensegallery.com, placedog.net"
 }
+
+variable "codekeeper_run_id" {
+  description = "CodeKeeper E2E run identifier used as the suffix of the SNS topic display name. Update this value when a new run ID is issued by the upstream change request process."
+  default     = "1778714586"
+}

@@ -2,13 +2,26 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "=3.42.0"
+      version = "~> 3.42"
     }
   }
 }
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+# Dedicated provider alias for resources that must reside in us-west-2,
+# such as the pre-existing codekeeper-test-alerts SNS topic.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
 
   default_tags {
     tags = {
@@ -203,4 +216,38 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Manages the pre-existing shared SNS alerts topic for CodeKeeper in us-west-2.
+# This topic name is intentionally NOT prefixed — it is a singleton shared
+# resource that must only be managed from this workspace.
+# The aws.us_west_2 provider alias ensures Terraform targets the correct region
+# regardless of the default var.region value.
+#
+# Deletion protection notes:
+#   - prevent_destroy = true blocks accidental `terraform destroy` of this resource.
+#   - It does NOT protect against workspace deletion or manual removal of the
+#     lifecycle block. For stronger protection, apply an AWS SCP or resource
+#     policy that denies sns:DeleteTopic on this ARN.
+#
+# display_name is managed via var.codekeeper_run_id (see variables.tf).
+# ignore_changes on display_name prevents Terraform from flagging drift if the
+# value is updated externally between apply cycles.
+#
+# Before first apply, import the existing topic using its ARN:
+#   terraform import aws_sns_topic.codekeeper_test_alerts <topic-arn>
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E ${var.codekeeper_run_id}"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [display_name]
+  }
 }
