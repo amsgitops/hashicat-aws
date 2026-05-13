@@ -28,12 +28,17 @@ resource "aws_vpc" "hashicat" {
   }
 }
 
-resource "aws_subnet" "hashicat" {
+# count = 1 is intentional: the resource is addressed as aws_subnet.public[0]
+# as required by the load-test tagging change spec.
+resource "aws_subnet" "public" {
+  count = 1
+
   vpc_id     = aws_vpc.hashicat.id
   cidr_block = var.subnet_prefix
 
   tags = {
-    name = "${var.prefix}-subnet"
+    Name        = "${var.prefix}-subnet"
+    LoadTestTag = var.load_test_tag
   }
 }
 
@@ -94,7 +99,7 @@ resource "aws_route_table" "hashicat" {
 }
 
 resource "aws_route_table_association" "hashicat" {
-  subnet_id      = aws_subnet.hashicat.id
+  subnet_id      = aws_subnet.public[0].id
   route_table_id = aws_route_table.hashicat.id
 }
 
@@ -130,7 +135,7 @@ resource "aws_instance" "hashicat" {
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.hashicat.key_name
   associate_public_ip_address = true
-  subnet_id                   = aws_subnet.hashicat.id
+  subnet_id                   = aws_subnet.public[0].id
   vpc_security_group_ids      = [aws_security_group.hashicat.id]
 
   tags = {

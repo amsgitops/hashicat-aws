@@ -52,3 +52,11 @@ variable "placeholder" {
   default     = "placekitten.com"
   description = "Image-as-a-service URL. Some other fun ones to try are fillmurray.com, placecage.com, placebeard.it, loremflickr.com, baconmockup.com, placeimg.com, placebear.com, placeskull.com, stevensegallery.com, placedog.net"
 }
+
+# load_test_tag is populated during load-test runs to correlate infrastructure
+# with a specific test execution. Defaults to "" for non-load-test deployments.
+variable "load_test_tag" {
+  type        = string
+  description = "Correlation ID for the load test run associated with this deployment. Set per run; leave empty for non-load-test deployments."
+  default     = ""
+}
