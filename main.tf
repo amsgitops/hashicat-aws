@@ -132,6 +132,7 @@ resource "aws_instance" "hashicat" {
   associate_public_ip_address = true
   subnet_id                   = aws_subnet.hashicat.id
   vpc_security_group_ids      = [aws_security_group.hashicat.id]
+  iam_instance_profile        = aws_iam_instance_profile.app.name
 
   tags = {
     Name = "${var.prefix}-hashicat-instance"
@@ -203,4 +204,33 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# IAM role for the hashicat app EC2 instance.
+# Attach least-privilege permissions policies to this role as needed for
+# application-specific AWS API access.
+resource "aws_iam_role" "app" {
+  name = "${var.prefix}-app-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    LoadTestTag = "1778646543107711818"
+  }
+}
+
+# Instance profile wrapping aws_iam_role.app so it can be attached to the
+# EC2 instance via iam_instance_profile.
+resource "aws_iam_instance_profile" "app" {
+  name = "${var.prefix}-app-profile"
+  role = aws_iam_role.app.name
 }
