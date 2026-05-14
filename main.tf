@@ -17,6 +17,25 @@ provider "aws" {
   }
 }
 
+# Provider alias targeting us-west-2 for cross-region resources (e.g. the
+# codekeeper-test-alerts SNS topic). The region is intentionally hard-coded
+# here because these resources are fixed to us-west-2 regardless of the
+# workspace's primary region (var.region).
+#
+# NOTE: The default_tags block below must be kept in sync with the primary
+# provider's default_tags block above. If new default tags are added to the
+# primary provider, add them here as well.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +222,45 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# This resource adopts the pre-existing SNS topic "codekeeper-test-alerts" in
+# us-west-2. Terraform manages name, display_name, and tags declared below.
+# The attributes in ignore_changes (policy, delivery_policy, kms_master_key_id,
+# fifo_topic, content_based_deduplication) are preserved as-is from the live
+# topic to prevent silent removal of out-of-band configuration on first apply.
+#
+# IMPORTANT: Before running `terraform apply`, import the existing topic.
+# Applying without importing first will result in an AWS API error because a
+# topic with this name already exists in the account:
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+#
+# NOTE: `prevent_destroy = true` below means `terraform destroy`, any plan
+# that replaces this resource (e.g. `terraform apply -replace=...`), and any
+# configuration change that forces recreation (e.g. renaming the topic) will
+# all fail while this lifecycle block is present. Remove it before running a
+# full workspace teardown.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E 1778725282"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    # Preserve out-of-band values for attributes supported in aws v3.42.0
+    # that are not actively managed by this configuration.
+    ignore_changes = [
+      policy,
+      delivery_policy,
+      kms_master_key_id,
+      fifo_topic,
+      content_based_deduplication,
+    ]
+  }
 }
