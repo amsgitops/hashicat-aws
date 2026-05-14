@@ -17,6 +17,17 @@ provider "aws" {
   }
 }
 
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +214,23 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# To bring this topic under Terraform management, run the following import command
+# before the first `terraform apply`:
+#
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:$(aws sts get-caller-identity --query Account --output text):codekeeper-test-alerts
+#
+# (The provider alias "us_west_2" ensures the import targets the correct region.)
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider = aws.us_west_2
+
+  name         = "codekeeper-test-alerts"
+  display_name = "GetTest 1778724662"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
 }
