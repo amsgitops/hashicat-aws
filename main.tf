@@ -7,8 +7,25 @@ terraform {
   }
 }
 
+# NOTE: This stack manages resources in two AWS regions:
+#   - var.region (default: us-east-1) for the primary infrastructure below.
+#   - us-west-2 (via the aws.us_west_2 provider alias) for the pre-existing SNS topic.
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+# Hardcoded to us-west-2 because the SNS topic predates this stack and lives in a fixed region.
+# Intentionally uses the same ambient credentials as the default provider.
+# The IAM principal must have sns:SetTopicAttributes permissions in us-west-2.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
 
   default_tags {
     tags = {
@@ -203,4 +220,42 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Manages the existing SNS topic in us-west-2.
+# - display_name is Terraform-authoritative: Terraform will enforce "CodeKeeper E2E 1778726225"
+#   on the first apply after import. Run `terraform plan` post-import and verify the displayed
+#   change is intentional before applying.
+# - name is immutable in AWS SNS. Changing it would force resource replacement, which
+#   prevent_destroy will block with a hard error. Do not rename this resource.
+# - prevent_destroy = true means `terraform destroy` on this workspace will always fail.
+#   To decommission this topic, remove prevent_destroy from this block first.
+# Import with: terraform import aws_sns_topic.codekeeper_test_alerts arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E 1778726225"
+
+  lifecycle {
+    prevent_destroy = true
+    # Ignore delivery/feedback attributes and tags that may be managed outside Terraform
+    # to avoid unintended drift after import.
+    # kms_master_key_id is intentionally NOT ignored so Terraform enforces encryption state.
+    # Note: application_* and firehose_* feedback attributes are excluded because they
+    # require provider >= 3.43.0 and this stack is pinned to 3.42.0.
+    ignore_changes = [
+      tags,
+      tags_all,
+      delivery_policy,
+      lambda_failure_feedback_role_arn,
+      lambda_success_feedback_role_arn,
+      lambda_success_feedback_sample_rate,
+      sqs_failure_feedback_role_arn,
+      sqs_success_feedback_role_arn,
+      sqs_success_feedback_sample_rate,
+      http_failure_feedback_role_arn,
+      http_success_feedback_role_arn,
+      http_success_feedback_sample_rate,
+    ]
+  }
 }
