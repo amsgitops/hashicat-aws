@@ -17,6 +17,17 @@ provider "aws" {
   }
 }
 
+provider "aws" {
+  alias  = "us_west_2"
+  region = var.sns_region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +214,16 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Manages the existing SNS topic in us-west-2.
+# Import with: terraform import aws_sns_topic.codekeeper_test_alerts arn:aws:sns:us-west-2:<ACCOUNT_ID>:codekeeper-test-alerts
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "CodeKeeper E2E 1778724343"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

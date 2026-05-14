@@ -52,3 +52,13 @@ variable "placeholder" {
   default     = "placekitten.com"
   description = "Image-as-a-service URL. Some other fun ones to try are fillmurray.com, placecage.com, placebeard.it, loremflickr.com, baconmockup.com, placeimg.com, placebear.com, placeskull.com, stevensegallery.com, placedog.net"
 }
+
+variable "sns_region" {
+  description = "The AWS region used for the SNS provider alias (aws.us_west_2)."
+  default     = "us-west-2"
+
+  validation {
+    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]+$", var.sns_region))
+    error_message = "sns_region must be a valid AWS region identifier (e.g. us-west-2)."
+  }
+}
