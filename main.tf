@@ -17,6 +17,19 @@ provider "aws" {
   }
 }
 
+# Aliased provider fixed to us-west-2 for resources that must reside in that
+# region regardless of the value of var.region.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +216,13 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Data source lookup for the pre-existing codekeeper-test-alerts SNS topic in
+# us-west-2. Using a data source (rather than a managed resource) ensures that
+# this workspace's terraform destroy does not attempt to delete a shared,
+# long-lived alerting topic.
+data "aws_sns_topic" "codekeeper_test_alerts" {
+  provider = aws.us_west_2
+  name     = "codekeeper-test-alerts"
 }
