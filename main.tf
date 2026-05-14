@@ -3,12 +3,25 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "=3.42.0"
+      configuration_aliases = [aws.us_west_2]
     }
   }
 }
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+# Provider alias targeting us-west-2 for resources that must reside in that region.
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
 
   default_tags {
     tags = {
@@ -203,4 +216,18 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# SNS Topic: codekeeper-test-alerts (us-west-2)
+# Pinned to the us-west-2 provider alias to match the topic's original region.
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider = aws.us_west_2
+
+  name         = "codekeeper-test-alerts"
+  display_name = var.sns_alert_topic_display_name
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
 }
