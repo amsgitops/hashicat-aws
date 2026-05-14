@@ -17,6 +17,19 @@ provider "aws" {
   }
 }
 
+# Hardcoded to us-west-2 to match the existing SNS topic:
+# arn:aws:sns:us-west-2:...:codekeeper-test-alerts
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +216,70 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Resolve the caller's account ID using the us-west-2 provider so the value
+# is authoritative for the SNS resources below.
+data "aws_caller_identity" "current" {
+  provider = aws.us_west_2
+}
+
+# Bring the existing SNS topic under Terraform management.
+# IMPORTANT: Before the first `terraform apply`, import the existing topic:
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<account_id>:codekeeper-test-alerts
+#
+# Explicit tags are omitted: aws_sns_topic tag support requires provider
+# >= 3.43.0; the RepositoryId tag is applied via provider default_tags.
+#
+# NOTE: The Terraform execution role must have sns:SetTopicAttributes granted
+# via its IAM identity policy to allow Terraform to update display_name and
+# other topic attributes. This action is intentionally excluded from the
+# resource-based policy below (it is not needed there for same-account callers).
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = var.sns_codekeeper_display_name
+}
+
+# Least-privilege resource-based policy for the codekeeper-test-alerts topic.
+#
+# Access is restricted to the account root (covers all IAM principals in the
+# account subject to their identity policies). Administrative and destructive
+# actions (DeleteTopic, SetTopicAttributes, AddPermission, RemovePermission)
+# are intentionally excluded here; they must be granted via IAM identity
+# policies on specific roles.
+#
+# No AWS service principals (e.g. cloudwatch.amazonaws.com) are required for
+# this topic at this time. If a service integration is added in future, append
+# a new Statement block with the appropriate Service principal and an
+# aws:SourceAccount condition to prevent confused-deputy attacks.
+#
+# IMPORTANT: This resource replaces the entire existing topic policy on apply.
+# Verify the current policy in AWS before applying to avoid removing any
+# existing service-principal grants.
+resource "aws_sns_topic_policy" "codekeeper_test_alerts" {
+  provider = aws.us_west_2
+  arn      = aws_sns_topic.codekeeper_test_alerts.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowTopicOwnerPublishSubscribe"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "SNS:Publish",
+          "SNS:Subscribe",
+          "SNS:Receive",
+          "SNS:GetTopicAttributes",
+          "SNS:ListSubscriptionsByTopic",
+        ]
+        Resource = aws_sns_topic.codekeeper_test_alerts.arn
+      }
+    ]
+  })
 }
