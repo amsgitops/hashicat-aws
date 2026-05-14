@@ -2,13 +2,24 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "=3.42.0"
+      version = "~> 5.0"
     }
   }
 }
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
 
   default_tags {
     tags = {
@@ -117,7 +128,6 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_eip" "hashicat" {
   instance = aws_instance.hashicat.id
-  vpc      = true
 }
 
 resource "aws_eip_association" "hashicat" {
@@ -203,4 +213,18 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# SNS Topic: codekeeper-test-alerts (us-west-2)
+# display_name set per integration test desired state
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider = aws.us_west_2
+
+  name         = "codekeeper-test-alerts"
+  display_name = "GetTest 1778717216"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
 }
