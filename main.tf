@@ -17,6 +17,17 @@ provider "aws" {
   }
 }
 
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      RepositoryId = "amsgitops/hashicat-aws"
+    }
+  }
+}
+
 resource "aws_vpc" "hashicat" {
   cidr_block           = var.address_space
   enable_dns_hostnames = true
@@ -203,4 +214,40 @@ locals {
 resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
+}
+
+# Manages the pre-existing SNS topic "codekeeper-test-alerts" in us-west-2.
+#
+# Region note: The aliased provider (aws.us_west_2) hard-codes region = "us-west-2"
+# and is intentionally independent of var.region, which controls the primary region
+# for all other resources in this workspace.
+#
+# IMPORTANT — Import before first apply:
+# This resource block targets an existing AWS SNS topic. Before running
+# `terraform apply` for the first time, import the topic into state to prevent
+# Terraform from attempting to create a duplicate:
+#   terraform import aws_sns_topic.codekeeper_test_alerts \
+#     arn:aws:sns:us-west-2:<account_id>:codekeeper-test-alerts
+#
+# display_name note: The value "GetTest 1778725021" is the confirmed, intended
+# display name of the existing topic. display_name and tags_all are listed in
+# ignore_changes to prevent persistent plan diffs: display_name guards against
+# any live-value drift, and tags_all suppresses the known persistent-diff bug
+# between default_tags and aws_sns_topic in AWS provider 3.x
+# (https://github.com/hashicorp/terraform-provider-aws/issues/19583).
+#
+# prevent_destroy note: `prevent_destroy = true` guards against accidental
+# deletion of this shared topic. Be aware that this also blocks a full
+# `terraform destroy` of the workspace. To tear down the workspace, first
+# remove this resource from state:
+#   terraform state rm aws_sns_topic.codekeeper_test_alerts
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  provider     = aws.us_west_2
+  name         = "codekeeper-test-alerts"
+  display_name = "GetTest 1778725021" # confirmed display name of existing topic
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [display_name, tags_all]
+  }
 }
