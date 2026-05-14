@@ -204,3 +204,14 @@ resource "aws_key_pair" "hashicat" {
   key_name   = local.private_key_filename
   public_key = tls_private_key.hashicat.public_key_openssh
 }
+
+resource "aws_sns_topic" "codekeeper_test_alerts" {
+  name              = "codekeeper-test-alerts"
+  display_name      = "GetTest 1778716605"
+  kms_master_key_id = "alias/aws/sns"
+
+  tags = {
+    Name        = "codekeeper-test-alerts"
+    environment = "Production"
+  }
+}
