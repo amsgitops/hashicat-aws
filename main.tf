@@ -24,7 +24,7 @@ resource "aws_vpc" "hashicat" {
   tags = {
     name        = "${var.prefix}-vpc-${var.region}"
     environment = "Production"
-    TestTag     = "Testing-1792902471862710656"
+    TestTag     = "Testing-1794406993583638582"
   }
 }
 
